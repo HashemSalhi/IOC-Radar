@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { maybeDefang } from '../utils/defang'
 import RiskBadge from './RiskBadge'
 import ResultDetailModal from './ResultDetailModal'
 
@@ -13,12 +14,20 @@ const COLUMNS = [
 
 const RISK_ORDER = { High: 0, Medium: 1, Low: 2 }
 
-function exportCSV(rows) {
+function download(content, ext, mime) {
+  const blob = new Blob([content], { type: mime })
+  const a = document.createElement('a')
+  a.href = URL.createObjectURL(blob)
+  a.download = `bulk-ioc-scanner-export-${Date.now()}.${ext}`
+  a.click()
+}
+
+function exportCSV(rows, defangOn) {
   const headers = ['IOC', 'Type', 'Risk Band', 'Risk Score', 'Detection Ratio', 'Status', 'Tag', 'Source File', 'Scanned At']
   const lines = [
     headers.join(','),
     ...rows.map(r => [
-      `"${r.ioc}"`,
+      `"${maybeDefang(r.ioc, defangOn)}"`,
       r.ioc_type,
       r.risk_band || '',
       r.risk_score ?? '',
@@ -29,11 +38,25 @@ function exportCSV(rows) {
       r.created_at ? new Date(r.created_at).toISOString() : '',
     ].join(','))
   ]
-  const blob = new Blob([lines.join('\n')], { type: 'text/csv' })
-  const a = document.createElement('a')
-  a.href = URL.createObjectURL(blob)
-  a.download = `bulk-ioc-scanner-export-${Date.now()}.csv`
-  a.click()
+  download(lines.join('\n'), 'csv', 'text/csv')
+}
+
+function exportJSON(rows, defangOn) {
+  const data = rows.map(r => ({
+    ioc: maybeDefang(r.ioc, defangOn),
+    type: r.ioc_type,
+    risk_band: r.risk_band,
+    risk_score: r.risk_score,
+    detection_ratio: r.detection_ratio,
+    status: r.status,
+    tag: r.tag,
+    source_filename: r.source_filename,
+    scanned_at: r.created_at,
+    providers: (r.provider_results || []).map(p => ({
+      provider: p.provider, success: p.success, error: p.error, raw: p.raw,
+    })),
+  }))
+  download(JSON.stringify(data, null, 2), 'json', 'application/json')
 }
 
 export default function ResultsTable({ results, onTagUpdated, onResultReplaced }) {
@@ -42,6 +65,7 @@ export default function ResultsTable({ results, onTagUpdated, onResultReplaced }
   const [riskFilter, setRiskFilter] = useState('all')
   const [sortKey, setSortKey] = useState('risk_band')
   const [sortDir, setSortDir] = useState('asc')
+  const [defangOn, setDefangOn] = useState(false)
   const [selected, setSelected] = useState(null)
 
   const types = useMemo(() => {
@@ -122,11 +146,26 @@ export default function ResultsTable({ results, onTagUpdated, onResultReplaced }
         </div>
         <div className="flex items-center gap-2 text-xs text-slate-500 font-mono">
           <span>{filtered.length}/{results.length} results</span>
+          <label className="flex items-center gap-1 cursor-pointer select-none" title="Defang IOCs in exports (8.8.8.8 → 8[.]8[.]8[.]8)">
+            <input
+              type="checkbox"
+              checked={defangOn}
+              onChange={e => setDefangOn(e.target.checked)}
+              className="accent-cyan-600"
+            />
+            Defang
+          </label>
           <button
-            onClick={() => exportCSV(filtered)}
+            onClick={() => exportCSV(filtered, defangOn)}
             className="px-3 py-1.5 border border-[#1e2d4a] text-slate-400 hover:text-cyan-400 hover:border-cyan-700 rounded transition-all"
           >
-            ⬇ Export CSV
+            ⬇ CSV
+          </button>
+          <button
+            onClick={() => exportJSON(filtered, defangOn)}
+            className="px-3 py-1.5 border border-[#1e2d4a] text-slate-400 hover:text-cyan-400 hover:border-cyan-700 rounded transition-all"
+          >
+            ⬇ JSON
           </button>
         </div>
       </div>

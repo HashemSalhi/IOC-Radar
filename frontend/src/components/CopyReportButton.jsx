@@ -1,6 +1,7 @@
 import { useState } from 'react'
+import { maybeDefang } from '../utils/defang'
 
-export function buildReport(result) {
+export function buildReport(result, defangOn = false) {
   const pr = result.provider_results || []
   const vtResult = pr.find(p => p.provider === 'virustotal')
   const abuseResult = pr.find(p => p.provider === 'abuseipdb')
@@ -9,7 +10,7 @@ export function buildReport(result) {
     '═══════════════════════════════════════',
     '           BULK-IOC-SCANNER REPORT            ',
     '═══════════════════════════════════════',
-    `IOC:         ${result.ioc}`,
+    `IOC:         ${maybeDefang(result.ioc, defangOn)}`,
     `Type:        ${result.ioc_type?.toUpperCase() || 'UNKNOWN'}`,
     `Risk:        ${result.risk_band || 'N/A'} (${result.risk_score ?? 'N/A'}/100)`,
     `Detection:   ${result.detection_ratio || 'N/A'}`,
@@ -64,9 +65,10 @@ export function buildReport(result) {
 
 export default function CopyReportButton({ result }) {
   const [copied, setCopied] = useState(false)
+  const [defangOn, setDefangOn] = useState(false)
 
   async function handleCopy() {
-    const text = buildReport(result)
+    const text = buildReport(result, defangOn)
     try {
       await navigator.clipboard.writeText(text)
       setCopied(true)
@@ -85,11 +87,22 @@ export default function CopyReportButton({ result }) {
   }
 
   return (
-    <button
-      onClick={handleCopy}
-      className="px-3 py-1.5 text-xs font-mono border border-[#1e2d4a] text-slate-400 hover:text-cyan-400 hover:border-cyan-700 rounded transition-all"
-    >
-      {copied ? '✓ Copied' : '⎘ Copy Report'}
-    </button>
+    <div className="flex items-center gap-3">
+      <label className="flex items-center gap-1 text-xs font-mono text-slate-500 cursor-pointer select-none" title="Defang IOCs in the report">
+        <input
+          type="checkbox"
+          checked={defangOn}
+          onChange={e => setDefangOn(e.target.checked)}
+          className="accent-cyan-600"
+        />
+        Defang
+      </label>
+      <button
+        onClick={handleCopy}
+        className="px-3 py-1.5 text-xs font-mono border border-[#1e2d4a] text-slate-400 hover:text-cyan-400 hover:border-cyan-700 rounded transition-all"
+      >
+        {copied ? '✓ Copied' : '⎘ Copy Report'}
+      </button>
+    </div>
   )
 }
