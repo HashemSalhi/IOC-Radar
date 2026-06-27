@@ -20,6 +20,8 @@ async def lifespan(app: FastAPI):
         from app.services.keystore import keystore
         await keystore.load_from_db(db)
     yield
+    from app.database.db import engine
+    await engine.dispose()
 
 
 app = FastAPI(

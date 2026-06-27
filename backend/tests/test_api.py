@@ -79,7 +79,7 @@ async def test_force_bypasses_cache(client):
 async def test_timestamps_are_utc_iso(client):
     data = (await client.post("/api/scan", json={"iocs": ["8.8.4.4"]})).json()
     assert data[0]["created_at"].endswith("Z")
-    hist = (await client.get("/api/history")).json()
+    hist = (await client.get("/api/history")).json()["items"]
     assert all(h["created_at"].endswith("Z") for h in hist)
 
 
@@ -87,8 +87,39 @@ async def test_history_records_scans(client):
     await client.post("/api/scan", json={"iocs": ["198.51.100.7"]})
     r = await client.get("/api/history")
     assert r.status_code == 200
-    iocs = [h["ioc"] for h in r.json()]
+    body = r.json()
+    iocs = [h["ioc"] for h in body["items"]]
     assert "198.51.100.7" in iocs
+    assert body["total"] >= 1
+
+
+async def test_history_pagination_and_filters(client):
+    for ip in ["10.0.0.1", "10.0.0.2", "10.0.0.3"]:
+        await client.post("/api/scan", json={"iocs": [ip]})
+    # limit/offset
+    page = (await client.get("/api/history?limit=2&offset=0")).json()
+    assert len(page["items"]) == 2
+    assert page["total"] >= 3
+    # substring search
+    found = (await client.get("/api/history?q=10.0.0.2")).json()
+    assert all("10.0.0.2" in h["ioc"] for h in found["items"])
+    assert found["total"] == 1
+
+
+async def test_history_tag_filter(client):
+    scan = (await client.post("/api/scan", json={"iocs": ["172.16.9.9"]})).json()[0]
+    await client.patch(f"/api/scan/{scan['id']}/tag", json={"tag": "Phishing"})
+    tagged = (await client.get("/api/history?tag=Phishing")).json()
+    assert all(h["tag"] == "Phishing" for h in tagged["items"])
+    assert any(h["ioc"] == "172.16.9.9" for h in tagged["items"])
+
+
+async def test_notes_round_trip(client):
+    scan = (await client.post("/api/scan", json={"iocs": ["172.16.1.1"]})).json()[0]
+    r = await client.patch(f"/api/scan/{scan['id']}/notes", json={"notes": "Seen in phishing email"})
+    assert r.status_code == 200
+    detail = (await client.get(f"/api/history/{scan['id']}")).json()
+    assert detail["notes"] == "Seen in phishing email"
 
 
 async def test_history_detail_and_stats(client):

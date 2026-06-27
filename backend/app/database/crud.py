@@ -51,11 +51,43 @@ async def update_scan_tag(db: AsyncSession, scan_id: int, tag: str | None) -> bo
     return True
 
 
-async def list_scans(db: AsyncSession, limit: int = 500) -> list[Scan]:
-    result = await db.execute(
-        select(Scan).order_by(desc(Scan.created_at)).limit(limit)
-    )
+def _history_query(q: str | None, tag: str | None):
+    stmt = select(Scan)
+    if q:
+        stmt = stmt.where(Scan.ioc.ilike(f"%{q}%"))
+    if tag:
+        stmt = stmt.where(Scan.tag == tag)
+    return stmt
+
+
+async def list_scans(
+    db: AsyncSession,
+    limit: int = 500,
+    offset: int = 0,
+    q: str | None = None,
+    tag: str | None = None,
+) -> list[Scan]:
+    stmt = _history_query(q, tag).order_by(desc(Scan.created_at)).limit(limit).offset(offset)
+    result = await db.execute(stmt)
     return list(result.scalars().all())
+
+
+async def count_scans(db: AsyncSession, q: str | None = None, tag: str | None = None) -> int:
+    from sqlalchemy import func
+
+    stmt = select(func.count()).select_from(_history_query(q, tag).subquery())
+    result = await db.execute(stmt)
+    return int(result.scalar_one())
+
+
+async def update_scan_notes(db: AsyncSession, scan_id: int, notes: str | None) -> bool:
+    result = await db.execute(select(Scan).where(Scan.id == scan_id))
+    scan = result.scalar_one_or_none()
+    if scan is None:
+        return False
+    scan.notes = notes
+    await db.commit()
+    return True
 
 
 async def get_recent_scan(

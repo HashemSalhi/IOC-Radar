@@ -22,6 +22,7 @@ class Scan(Base):
     detection_ratio: Mapped[str | None] = mapped_column(String(32), nullable=True)  # "12/70"
     status: Mapped[str] = mapped_column(String(16), default="completed")  # completed/error
     tag: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     source_filename: Mapped[str | None] = mapped_column(String(512), nullable=True)
     file_size: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime.datetime] = mapped_column(

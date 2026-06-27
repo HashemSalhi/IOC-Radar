@@ -100,9 +100,21 @@ export const tagScan = (scanId, tag) =>
     body: JSON.stringify({ tag }),
   })
 
+export const saveNotes = (scanId, notes) =>
+  request(`/scan/${scanId}/notes`, {
+    method: 'PATCH',
+    body: JSON.stringify({ notes }),
+  })
+
 // ── History ───────────────────────────────────────────────────────────────────
 
-export const getHistory = () => request('/history')
+// Returns { items, total }
+export const getHistory = ({ limit = 50, offset = 0, q = '', tag = '' } = {}) => {
+  const params = new URLSearchParams({ limit, offset })
+  if (q) params.set('q', q)
+  if (tag) params.set('tag', tag)
+  return request(`/history?${params.toString()}`)
+}
 
 export const getHistoryStats = () => request('/history/stats')
 

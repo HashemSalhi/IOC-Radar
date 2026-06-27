@@ -23,10 +23,10 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    Promise.all([getHistoryStats(), getHistory(), getSettings()])
+    Promise.all([getHistoryStats(), getHistory({ limit: 10 }), getSettings()])
       .then(([s, h, cfg]) => {
         setStats(s)
-        setRecent(h.slice(0, 10))
+        setRecent(h.items)
         setProviderStatus(cfg.providers)
       })
       .catch(console.error)

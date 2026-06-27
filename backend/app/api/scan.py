@@ -7,11 +7,12 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
-from app.database.crud import save_scan, update_scan_tag
-from app.database.db import get_db
+from app.database.crud import save_scan, update_scan_notes, update_scan_tag
+from app.database.db import AsyncSessionLocal, get_db
 from app.models.schemas import (
     FileHashInfo,
     FileScanResult,
+    NotesUpdate,
     ScanRequest,
     ScanResult,
     TagUpdate,
@@ -68,7 +69,6 @@ async def scan_text(
 async def scan_stream(
     body: ScanRequest,
     force: bool = False,
-    db: AsyncSession = Depends(get_db),
 ):
     """
     Stream scan results as newline-delimited JSON (one ScanResult per line),
@@ -78,8 +78,10 @@ async def scan_stream(
     logger.info("Stream scan: %d IOCs (force=%s)", len(validated), force)
 
     async def generate():
-        async for result in scan_bulk_stream(validated, db=db, force=force):
-            yield result.model_dump_json() + "\n"
+        # Own the session so it closes deterministically when the stream ends
+        async with AsyncSessionLocal() as db:
+            async for result in scan_bulk_stream(validated, db=db, force=force):
+                yield result.model_dump_json() + "\n"
 
     return StreamingResponse(generate(), media_type="application/x-ndjson")
 
@@ -143,3 +145,16 @@ async def tag_scan(
     if not ok:
         raise HTTPException(status_code=404, detail="Scan not found")
     return {"status": "ok", "scan_id": scan_id, "tag": body.tag}
+
+
+@router.patch("/{scan_id}/notes", response_model=dict)
+async def notes_scan(
+    scan_id: int,
+    body: NotesUpdate,
+    db: AsyncSession = Depends(get_db),
+):
+    """Update free-text analyst notes on a historical scan result."""
+    ok = await update_scan_notes(db, scan_id, body.notes)
+    if not ok:
+        raise HTTPException(status_code=404, detail="Scan not found")
+    return {"status": "ok", "scan_id": scan_id, "notes": body.notes}

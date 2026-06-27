@@ -1,34 +1,35 @@
 """Scan history endpoints."""
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.database.crud import get_scan, get_stats, hydrate_provider_results, list_scans
+from app.database.crud import (
+    count_scans,
+    get_scan,
+    get_stats,
+    hydrate_provider_results,
+    list_scans,
+)
 from app.database.db import get_db
-from app.models.schemas import ScanDetail, ScanHistoryItem
+from app.models.schemas import HistoryPage, ScanDetail, ScanHistoryItem
 
 router = APIRouter(prefix="/api/history", tags=["history"])
 
 
-@router.get("", response_model=list[ScanHistoryItem])
-async def get_history(db: AsyncSession = Depends(get_db)):
-    """Return all scans ordered by newest first."""
-    scans = await list_scans(db)
-    return [
-        ScanHistoryItem(
-            id=s.id,
-            ioc=s.ioc,
-            ioc_type=s.ioc_type,
-            risk_score=s.risk_score,
-            risk_band=s.risk_band,
-            detection_ratio=s.detection_ratio,
-            status=s.status,
-            tag=s.tag,
-            source_filename=s.source_filename,
-            file_size=s.file_size,
-            created_at=s.created_at,
-        )
-        for s in scans
-    ]
+@router.get("", response_model=HistoryPage)
+async def get_history(
+    limit: int = Query(50, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+    q: str | None = Query(None, description="Substring match on the IOC"),
+    tag: str | None = Query(None, description="Filter by tag"),
+    db: AsyncSession = Depends(get_db),
+):
+    """Return a page of scans (newest first) plus the total matching count."""
+    scans = await list_scans(db, limit=limit, offset=offset, q=q, tag=tag)
+    total = await count_scans(db, q=q, tag=tag)
+    return HistoryPage(
+        items=[ScanHistoryItem.model_validate(s) for s in scans],
+        total=total,
+    )
 
 
 @router.get("/stats", response_model=dict)
@@ -44,19 +45,6 @@ async def get_scan_detail(scan_id: int, db: AsyncSession = Depends(get_db)):
     if scan is None:
         raise HTTPException(status_code=404, detail="Scan not found")
 
-    provider_results = hydrate_provider_results(scan)
-
-    return ScanDetail(
-        id=scan.id,
-        ioc=scan.ioc,
-        ioc_type=scan.ioc_type,
-        risk_score=scan.risk_score,
-        risk_band=scan.risk_band,
-        detection_ratio=scan.detection_ratio,
-        status=scan.status,
-        tag=scan.tag,
-        source_filename=scan.source_filename,
-        file_size=scan.file_size,
-        created_at=scan.created_at,
-        provider_results=provider_results,
-    )
+    detail = ScanDetail.model_validate(scan)
+    detail.provider_results = hydrate_provider_results(scan)
+    return detail

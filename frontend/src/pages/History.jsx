@@ -1,21 +1,39 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { getScanDetail, getHistory } from '../api/client'
 import RiskBadge from '../components/RiskBadge'
 import ResultDetailModal from '../components/ResultDetailModal'
 
+const TAGS = ['', 'Malware', 'Phishing', 'Investigation', 'False Positive']
+const PAGE_SIZE = 50
+
 export default function HistoryPage() {
   const [history, setHistory] = useState([])
+  const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [selected, setSelected] = useState(null)
   const [loadingDetail, setLoadingDetail] = useState(false)
 
-  useEffect(() => {
-    getHistory()
-      .then(setHistory)
+  // Filters / pagination
+  const [search, setSearch] = useState('')
+  const [tag, setTag] = useState('')
+  const [page, setPage] = useState(0)
+
+  const load = useCallback(() => {
+    setLoading(true)
+    getHistory({ limit: PAGE_SIZE, offset: page * PAGE_SIZE, q: search, tag })
+      .then(res => { setHistory(res.items); setTotal(res.total) })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false))
-  }, [])
+  }, [page, search, tag])
+
+  // Debounce search/tag/page changes
+  useEffect(() => {
+    const t = setTimeout(load, 250)
+    return () => clearTimeout(t)
+  }, [load])
+
+  const maxPage = Math.max(0, Math.ceil(total / PAGE_SIZE) - 1)
 
   async function handleRowClick(item) {
     setLoadingDetail(true)
@@ -41,19 +59,36 @@ export default function HistoryPage() {
     setSelected(updated)
   }
 
-  if (loading) return <div className="p-6 text-slate-500 font-mono text-sm">Loading history…</div>
   if (error) return <div className="p-6 text-red-400 font-mono text-sm">✕ {error}</div>
 
   return (
     <div className="p-6 space-y-5 max-w-5xl">
       <div>
         <h1 className="text-xl font-mono font-bold text-slate-200">Scan History</h1>
-        <p className="text-xs text-slate-500 mt-1">{history.length} scans stored · click a row to view details</p>
+        <p className="text-xs text-slate-500 mt-1">{total} scans stored · click a row to view details</p>
+      </div>
+
+      {/* Filters */}
+      <div className="flex flex-wrap gap-2 items-center">
+        <input
+          value={search}
+          onChange={e => { setPage(0); setSearch(e.target.value) }}
+          placeholder="Search IOC…"
+          className="bg-slate-900 border border-[#1e2d4a] rounded px-3 py-1.5 text-xs font-mono text-slate-300 placeholder-slate-600 focus:outline-none focus:border-cyan-700 w-56"
+        />
+        <select
+          value={tag}
+          onChange={e => { setPage(0); setTag(e.target.value) }}
+          className="bg-slate-900 border border-[#1e2d4a] rounded px-2 py-1.5 text-xs font-mono text-slate-400 focus:outline-none focus:border-cyan-700"
+        >
+          {TAGS.map(t => <option key={t} value={t}>{t === '' ? 'All tags' : t}</option>)}
+        </select>
+        {loading && <span className="text-xs font-mono text-slate-600">loading…</span>}
       </div>
 
       {history.length === 0 ? (
         <div className="text-center py-20 text-slate-600 font-mono text-sm">
-          No scans yet — run your first scan from the Scan page.
+          {search || tag ? 'No scans match your filters.' : 'No scans yet — run your first scan from the Scan page.'}
         </div>
       ) : (
         <div className="overflow-x-auto rounded-lg border border-[#1e2d4a]">
@@ -87,6 +122,29 @@ export default function HistoryPage() {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* Pagination */}
+      {total > PAGE_SIZE && (
+        <div className="flex items-center justify-between text-xs font-mono text-slate-500">
+          <span>Page {page + 1} of {maxPage + 1}</span>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setPage(p => Math.max(0, p - 1))}
+              disabled={page === 0}
+              className="px-3 py-1 border border-[#1e2d4a] rounded hover:text-cyan-400 hover:border-cyan-700 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              ← Prev
+            </button>
+            <button
+              onClick={() => setPage(p => Math.min(maxPage, p + 1))}
+              disabled={page >= maxPage}
+              className="px-3 py-1 border border-[#1e2d4a] rounded hover:text-cyan-400 hover:border-cyan-700 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              Next →
+            </button>
+          </div>
         </div>
       )}
 

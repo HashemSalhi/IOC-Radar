@@ -1,8 +1,16 @@
 import { useState } from 'react'
-import { rescan } from '../api/client'
+import { rescan, saveNotes } from '../api/client'
 import CopyReportButton, { buildReport } from './CopyReportButton'
 import RiskBadge from './RiskBadge'
 import TagSelector from './TagSelector'
+
+const PROVIDER_NAMES = {
+  virustotal: 'VirusTotal',
+  abuseipdb: 'AbuseIPDB',
+  greynoise: 'GreyNoise',
+  threatfox: 'ThreatFox',
+  urlscan: 'URLScan.io',
+}
 
 function Section({ title, children }) {
   return (
@@ -111,6 +119,8 @@ function ProviderPanel({ pr }) {
 
 export default function ResultDetailModal({ result, onClose, onTagged, onRescanned }) {
   const [localTag, setLocalTag] = useState(result?.tag || null)
+  const [notes, setNotes] = useState(result?.notes || '')
+  const [notesSaved, setNotesSaved] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const [refreshError, setRefreshError] = useState(null)
 
@@ -119,6 +129,17 @@ export default function ResultDetailModal({ result, onClose, onTagged, onRescann
   function handleTagged(tag) {
     setLocalTag(tag)
     onTagged?.(result.id, tag)
+  }
+
+  async function handleNotesBlur() {
+    if (!result.id || notes === (result.notes || '')) return
+    try {
+      await saveNotes(result.id, notes)
+      setNotesSaved(true)
+      setTimeout(() => setNotesSaved(false), 1500)
+    } catch {
+      // keep the typed text; surfacing inline is enough
+    }
   }
 
   async function handleRefresh() {
@@ -208,8 +229,22 @@ export default function ResultDetailModal({ result, onClose, onTagged, onRescann
             </Section>
           )}
 
+          {result.id && (
+            <Section title="Notes">
+              <textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                onBlur={handleNotesBlur}
+                placeholder="Add investigation notes… (saved when you click away)"
+                rows={3}
+                className="w-full bg-slate-900 border border-[#1e2d4a] rounded px-3 py-2 text-xs font-mono text-slate-300 placeholder-slate-700 focus:outline-none focus:border-cyan-700 resize-y"
+              />
+              {notesSaved && <span className="text-[10px] font-mono text-emerald-400">✓ saved</span>}
+            </Section>
+          )}
+
           {(result.provider_results || []).map((pr) => (
-            <Section key={pr.provider} title={pr.provider === 'virustotal' ? 'VirusTotal' : pr.provider === 'abuseipdb' ? 'AbuseIPDB' : pr.provider}>
+            <Section key={pr.provider} title={PROVIDER_NAMES[pr.provider] || pr.provider}>
               <ProviderPanel pr={pr} />
             </Section>
           ))}

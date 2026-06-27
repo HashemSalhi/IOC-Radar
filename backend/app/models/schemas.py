@@ -67,6 +67,10 @@ class TagUpdate(BaseModel):
     tag: str | None = Field(None, description="Malware | Phishing | Investigation | False Positive | null to clear")
 
 
+class NotesUpdate(BaseModel):
+    notes: str | None = Field(None, description="Free-text analyst notes; null to clear")
+
+
 class ScanHistoryItem(BaseModel):
     id: int
     ioc: str
@@ -76,6 +80,7 @@ class ScanHistoryItem(BaseModel):
     detection_ratio: str | None
     status: str
     tag: str | None
+    notes: str | None = None
     source_filename: str | None
     file_size: int | None
     created_at: datetime
@@ -89,6 +94,11 @@ class ScanHistoryItem(BaseModel):
 
 class ScanDetail(ScanHistoryItem):
     provider_results: list[ProviderResult] = []
+
+
+class HistoryPage(BaseModel):
+    items: list[ScanHistoryItem]
+    total: int
 
 
 # ── Settings response ─────────────────────────────────────────────────────────
