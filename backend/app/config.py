@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     frontend_origin: str = "http://localhost:5173"
 
     # Database
-    database_url: str = "sqlite+aiosqlite:///./ioc_radar.db"
+    database_url: str = "sqlite+aiosqlite:///./bulk_ioc_scanner.db"
 
     @property
     def max_upload_bytes(self) -> int:

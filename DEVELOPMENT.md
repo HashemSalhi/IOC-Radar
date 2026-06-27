@@ -67,7 +67,7 @@ backend/app/
 frontend/src/
   api/client.js        — fetch wrapper: scanIOCs, scanText, scanFiles, tagScan, getHistory, getSettings
   components/
-    Sidebar.jsx        — nav with IOC-Radar branding
+    Sidebar.jsx        — nav with Bulk-IOC-Scanner branding
     RiskBadge.jsx      — color-coded High/Medium/Low chip
     ScanProgress.jsx   — progress bar for scan in-flight
     TagSelector.jsx    — Malware/Phishing/Investigation/False Positive buttons; calls tagScan API

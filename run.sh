@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# IOC-Radar one-command launcher (development mode).
+# Bulk-IOC-Scanner one-command launcher (development mode).
 # Bootstraps dependencies on first run, then starts the backend (FastAPI) and
 # frontend (Vite) together with live reload. Ctrl+C stops both.
 #
@@ -53,7 +53,7 @@ kill_tree() {
 cleanup() {
   trap - INT TERM EXIT
   echo ""
-  yellow "[stop] Shutting down IOC-Radar..."
+  yellow "[stop] Shutting down Bulk-IOC-Scanner..."
   for pid in "${PIDS[@]}"; do
     kill_tree "$pid"
   done
@@ -71,7 +71,7 @@ cyan "[start] Frontend -> http://localhost:$FRONTEND_PORT"
 PIDS+=($!)
 
 echo ""
-yellow "IOC-Radar is running. Open http://localhost:$FRONTEND_PORT  —  press Ctrl+C to stop."
+yellow "Bulk-IOC-Scanner is running. Open http://localhost:$FRONTEND_PORT  —  press Ctrl+C to stop."
 echo ""
 
 # Wait on both; if either exits, tear everything down.

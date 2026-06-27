@@ -32,7 +32,7 @@ function exportCSV(rows) {
   const blob = new Blob([lines.join('\n')], { type: 'text/csv' })
   const a = document.createElement('a')
   a.href = URL.createObjectURL(blob)
-  a.download = `ioc-radar-export-${Date.now()}.csv`
+  a.download = `bulk-ioc-scanner-export-${Date.now()}.csv`
   a.click()
 }
 

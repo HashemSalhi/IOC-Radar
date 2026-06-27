@@ -1,4 +1,4 @@
-"""IOC-Radar FastAPI application entry point."""
+"""Bulk-IOC-Scanner FastAPI application entry point."""
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -23,7 +23,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="IOC-Radar",
+    title="Bulk-IOC-Scanner",
     description="Bulk IOC threat intelligence scanner",
     version="1.0.0",
     lifespan=lifespan,
@@ -44,4 +44,4 @@ app.include_router(settings.router)
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "service": "IOC-Radar"}
+    return {"status": "ok", "service": "Bulk-IOC-Scanner"}

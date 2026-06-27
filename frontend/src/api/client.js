@@ -1,5 +1,5 @@
 /**
- * IOC-Radar API client.
+ * Bulk-IOC-Scanner API client.
  * All requests go to /api (proxied to backend in dev, same-origin in prod).
  */
 

@@ -1,4 +1,4 @@
-# IOC-Radar
+# Bulk-IOC-Scanner
 
 A web tool for SOC analysts to bulk-scan Indicators of Compromise — file hashes, IP
 addresses, domains, and URLs — against threat intelligence providers (VirusTotal & AbuseIPDB).
@@ -23,8 +23,8 @@ FastAPI · SQLite · React · Tailwind CSS
 You need `python3`, `npm`, and `bash`.
 
 ```bash
-git clone https://github.com/HashemSalhi/IOC-Radar.git
-cd IOC-Radar
+git clone https://github.com/HashemSalhi/Bulk-IOC-Scanner.git
+cd Bulk-IOC-Scanner
 ./run.sh
 ```
 

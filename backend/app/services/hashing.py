@@ -30,7 +30,7 @@ async def hash_upload(upload: UploadFile, max_bytes: int) -> FileHashes:
     sha256 = hashlib.sha256()
     total = 0
 
-    tmp_fd, tmp_path = tempfile.mkstemp(prefix="ioc_radar_")
+    tmp_fd, tmp_path = tempfile.mkstemp(prefix="bulk_ioc_scanner_")
     try:
         with os.fdopen(tmp_fd, "wb") as tmp_file:
             while True:

@@ -39,9 +39,9 @@ export default function Dashboard() {
     <div className="p-6 space-y-6 max-w-4xl">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <img src="/radar.svg" alt="radar" className="w-10 h-10" />
+        <img src="/logo.svg" alt="logo" className="w-10 h-10" />
         <div>
-          <h1 className="text-2xl font-mono font-bold text-cyan-400 tracking-widest">IOC-RADAR</h1>
+          <h1 className="text-2xl font-mono font-bold text-cyan-400 tracking-widest">BULK-IOC-SCANNER</h1>
           <p className="text-xs text-slate-500">Threat Intelligence Scanner · SOC Analyst Tool</p>
         </div>
       </div>
