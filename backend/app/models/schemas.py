@@ -1,7 +1,16 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_serializer
+
+
+def _utc_iso(dt: datetime | None) -> str | None:
+    """Serialize a (naive-UTC) datetime as an unambiguous ISO-8601 UTC string."""
+    if dt is None:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
 # ── Request models ────────────────────────────────────────────────────────────
@@ -44,7 +53,12 @@ class ScanResult(BaseModel):
     source_filename: str | None = None
     file_size: int | None = None
     created_at: datetime | None = None
+    from_cache: bool = False
     provider_results: list[ProviderResult] = []
+
+    @field_serializer("created_at")
+    def _ser_created_at(self, dt: datetime | None) -> str | None:
+        return _utc_iso(dt)
 
 
 # ── History / tag update ──────────────────────────────────────────────────────
@@ -67,6 +81,10 @@ class ScanHistoryItem(BaseModel):
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+    @field_serializer("created_at")
+    def _ser_created_at(self, dt: datetime | None) -> str | None:
+        return _utc_iso(dt)
 
 
 class ScanDetail(ScanHistoryItem):

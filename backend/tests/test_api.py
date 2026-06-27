@@ -50,6 +50,13 @@ async def test_scan_text_endpoint(client):
     assert len(r.json()) == 3
 
 
+async def test_timestamps_are_utc_iso(client):
+    data = (await client.post("/api/scan", json={"iocs": ["8.8.4.4"]})).json()
+    assert data[0]["created_at"].endswith("Z")
+    hist = (await client.get("/api/history")).json()
+    assert all(h["created_at"].endswith("Z") for h in hist)
+
+
 async def test_history_records_scans(client):
     await client.post("/api/scan", json={"iocs": ["198.51.100.7"]})
     r = await client.get("/api/history")
