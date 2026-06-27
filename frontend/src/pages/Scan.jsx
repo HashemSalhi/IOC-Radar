@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { scanFiles, scanText } from '../api/client'
+import { scanFiles, scanStream } from '../api/client'
 import FileDropzone from '../components/FileDropzone'
 import ResultsTable from '../components/ResultsTable'
 import ScanProgress from '../components/ScanProgress'
@@ -20,11 +20,15 @@ export default function ScanPage() {
 
     try {
       if (mode === 'text') {
-        const lines = input.split(/[\n,]+/).filter(l => l.trim())
-        setProgress({ total: lines.length, completed: 0, current: '...' })
-        const data = await scanText(input)
-        setResults(data)
-        setProgress({ total: lines.length, completed: lines.length, current: null })
+        const unique = [...new Set(input.split(/[\n,]+/).map(s => s.trim()).filter(Boolean))]
+        setProgress({ total: unique.length, completed: 0, current: 'Starting…' })
+        const collected = []
+        await scanStream(unique, (r) => {
+          collected.push(r)
+          setResults([...collected])
+          setProgress({ total: unique.length, completed: collected.length, current: r.ioc })
+        })
+        setProgress({ total: unique.length, completed: collected.length, current: null })
       } else {
         if (!selectedFiles.length) {
           setError('Please select at least one file')
@@ -140,8 +144,8 @@ export default function ScanPage() {
         </div>
       )}
 
-      {/* Results */}
-      {results.length > 0 && !scanning && (
+      {/* Results — render live as they stream in */}
+      {results.length > 0 && (
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-mono font-semibold text-slate-300">

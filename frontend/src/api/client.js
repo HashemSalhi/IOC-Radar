@@ -42,6 +42,38 @@ export const scanText = (text) =>
     body: JSON.stringify({ text }),
   })
 
+// Stream results as each IOC completes; calls onResult(result) per NDJSON line.
+export async function scanStream(iocs, onResult, { force = false } = {}) {
+  const res = await fetch(`${BASE}/scan/stream${force ? '?force=true' : ''}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ iocs }),
+  })
+  if (!res.ok) {
+    let detail = `HTTP ${res.status}`
+    try { detail = (await res.json()).detail || detail } catch {}
+    throw new Error(detail)
+  }
+  const reader = res.body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+  const handleLine = (line) => {
+    const t = line.trim()
+    if (t) onResult(JSON.parse(t))
+  }
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+    buffer += decoder.decode(value, { stream: true })
+    let nl
+    while ((nl = buffer.indexOf('\n')) >= 0) {
+      handleLine(buffer.slice(0, nl))
+      buffer = buffer.slice(nl + 1)
+    }
+  }
+  handleLine(buffer)
+}
+
 export const scanFiles = async (fileList) => {
   const formData = new FormData()
   for (const file of fileList) {

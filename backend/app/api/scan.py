@@ -3,10 +3,11 @@ import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
-from app.database.crud import save_scan
+from app.database.crud import save_scan, update_scan_tag
 from app.database.db import get_db
 from app.models.schemas import (
     FileHashInfo,
@@ -18,9 +19,8 @@ from app.models.schemas import (
 )
 from app.services.hashing import hash_upload
 from app.services.ioc_detect import parse_bulk_input
-from app.services.scanner import scan_bulk
+from app.services.scanner import scan_bulk, scan_bulk_stream
 from app.utils.validation import validate_ioc_list
-from app.database.crud import update_scan_tag
 
 router = APIRouter(prefix="/api/scan", tags=["scan"])
 logger = logging.getLogger(__name__)
@@ -62,6 +62,26 @@ async def scan_text(
         if not result.from_cache:
             result.id = await save_scan(db, result)
     return results
+
+
+@router.post("/stream")
+async def scan_stream(
+    body: ScanRequest,
+    force: bool = False,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Stream scan results as newline-delimited JSON (one ScanResult per line),
+    emitted as each IOC completes so the UI can show real progress.
+    """
+    validated = validate_ioc_list(body.iocs)
+    logger.info("Stream scan: %d IOCs (force=%s)", len(validated), force)
+
+    async def generate():
+        async for result in scan_bulk_stream(validated, db=db, force=force):
+            yield result.model_dump_json() + "\n"
+
+    return StreamingResponse(generate(), media_type="application/x-ndjson")
 
 
 @router.post("/files", response_model=list[FileScanResult])

@@ -44,6 +44,18 @@ async def test_scan_empty_rejected(client):
     assert r.status_code == 422
 
 
+async def test_scan_stream_ndjson(client):
+    import json
+    r = await client.post("/api/scan/stream", json={"iocs": ["5.5.5.5", "6.6.6.6", "7.7.7.7"]})
+    assert r.status_code == 200
+    assert r.headers["content-type"].startswith("application/x-ndjson")
+    lines = [ln for ln in r.text.strip().split("\n") if ln]
+    assert len(lines) == 3
+    parsed = [json.loads(ln) for ln in lines]
+    assert {p["ioc"] for p in parsed} == {"5.5.5.5", "6.6.6.6", "7.7.7.7"}
+    assert all(p["id"] for p in parsed)  # persisted with ids
+
+
 async def test_scan_text_endpoint(client):
     r = await client.post("/api/scan/text", json={"text": "8.8.8.8, example.com\n1.1.1.1"})
     assert r.status_code == 200

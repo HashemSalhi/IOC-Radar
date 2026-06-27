@@ -153,3 +153,40 @@ async def scan_bulk(
             results[idx] = res
 
     return [r for r in results if r is not None]
+
+
+async def scan_bulk_stream(
+    iocs: list[str],
+    db: AsyncSession,
+    force: bool = False,
+):
+    """
+    Async generator yielding each ScanResult as soon as it's ready (cache hits
+    first, then live results as they complete). Persists fresh results inline and
+    sets their id before yielding. Used by the NDJSON streaming endpoint.
+    """
+    from app.database.crud import get_recent_scan, save_scan
+
+    providers = get_providers()
+    typed_iocs = [(refang(i), None) for i in iocs]
+    typed_iocs = [(ioc, detect(ioc)) for ioc, _ in typed_iocs]
+
+    misses: list[tuple[str, str]] = []
+    for ioc, ioc_type in typed_iocs:
+        if not force:
+            cached = await get_recent_scan(db, ioc, ioc_type, settings.cache_ttl_hours)
+            if cached is not None:
+                yield _scan_from_cached(cached, None, None)
+                continue
+        misses.append((ioc, ioc_type))
+
+    if misses:
+        async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
+            tasks = [
+                asyncio.create_task(scan_ioc(client, providers, ioc, ioc_type))
+                for ioc, ioc_type in misses
+            ]
+            for coro in asyncio.as_completed(tasks):
+                result = await coro
+                result.id = await save_scan(db, result)
+                yield result
