@@ -193,7 +193,8 @@ async def test_settings_lists_all_providers(client):
     assert r.status_code == 200
     ids = {p["id"] for p in r.json()["providers"]}
     assert {"virustotal", "abuseipdb", "greynoise", "threatfox", "urlscan"} <= ids
-    assert all(p["enabled"] is False for p in r.json()["providers"])
+    # No keys configured => not active; toggle defaults on
+    assert all(p["active"] is False and p["key_configured"] is False for p in r.json()["providers"])
 
 
 async def test_settings_key_update_by_id(client):
@@ -203,12 +204,35 @@ async def test_settings_key_update_by_id(client):
     })
     assert r.status_code == 200
     providers = {p["id"]: p for p in r.json()["providers"]}
-    assert providers["virustotal"]["enabled"] is True
+    assert providers["virustotal"]["key_configured"] is True
+    assert providers["virustotal"]["active"] is True
     assert providers["virustotal"]["key_hint"] == "ABCD...5678"
-    assert providers["greynoise"]["enabled"] is True
+    assert providers["greynoise"]["active"] is True
     # Full keys are never returned
     assert "ABCD1234EFGH5678" not in r.text
-    # Clearing a key disables the provider
+    # Clearing a key deactivates the provider
     r = await client.put("/api/settings/keys", json={"keys": {"virustotal": ""}})
     providers = {p["id"]: p for p in r.json()["providers"]}
-    assert providers["virustotal"]["enabled"] is False
+    assert providers["virustotal"]["active"] is False
+    assert providers["virustotal"]["key_configured"] is False
+
+
+async def test_provider_toggle_off_and_on(client):
+    # Configure a key so the provider is active
+    await client.put("/api/settings/keys", json={"keys": {"virustotal": "ABCD1234EFGH5678"}})
+    # Turn it OFF — key stays configured, but it's no longer active
+    r = await client.put("/api/settings/toggle", json={"provider": "virustotal", "enabled": False})
+    assert r.status_code == 200
+    vt = {p["id"]: p for p in r.json()["providers"]}["virustotal"]
+    assert vt["enabled"] is False
+    assert vt["key_configured"] is True
+    assert vt["active"] is False
+    # Turn it back ON
+    r = await client.put("/api/settings/toggle", json={"provider": "virustotal", "enabled": True})
+    vt = {p["id"]: p for p in r.json()["providers"]}["virustotal"]
+    assert vt["active"] is True
+
+
+async def test_toggle_unknown_provider_404(client):
+    r = await client.put("/api/settings/toggle", json={"provider": "nope", "enabled": False})
+    assert r.status_code == 404

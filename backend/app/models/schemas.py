@@ -106,7 +106,9 @@ class HistoryPage(BaseModel):
 class ProviderStatus(BaseModel):
     id: str                       # provider id, e.g. "virustotal"
     name: str                     # display name, e.g. "VirusTotal"
-    enabled: bool
+    key_configured: bool          # a key is set (env or DB)
+    enabled: bool                 # user on/off toggle
+    active: bool                  # key_configured AND enabled — actually runs
     key_hint: str | None = None   # masked, e.g. "be97...b8e1"
 
 
@@ -119,6 +121,11 @@ class SettingsResponse(BaseModel):
 class ApiKeyUpdate(BaseModel):
     # {provider_id: key}; empty string clears, omitted leaves unchanged
     keys: dict[str, str] = {}
+
+
+class ProviderToggle(BaseModel):
+    provider: str
+    enabled: bool
 
 
 # ── File scan response ────────────────────────────────────────────────────────

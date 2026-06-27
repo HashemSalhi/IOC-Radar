@@ -4,7 +4,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings as cfg
 from app.database.db import get_db
-from app.models.schemas import ApiKeyUpdate, ProviderStatus, SettingsResponse
+from fastapi import HTTPException
+
+from app.models.schemas import (
+    ApiKeyUpdate,
+    ProviderStatus,
+    ProviderToggle,
+    SettingsResponse,
+)
 from app.providers.catalog import PROVIDERS, PROVIDERS_BY_ID
 from app.services.keystore import keystore
 
@@ -22,7 +29,9 @@ def _build_provider_list() -> list[ProviderStatus]:
         ProviderStatus(
             id=info.id,
             name=info.display,
+            key_configured=keystore.has_key(info.id),
             enabled=keystore.is_enabled(info.id),
+            active=keystore.is_active(info.id),
             key_hint=_mask_key(keystore.get(info.id)),
         )
         for info in PROVIDERS
@@ -57,4 +66,16 @@ async def update_api_keys(
     for provider_id, key in (body.keys or {}).items():
         if provider_id in PROVIDERS_BY_ID:
             await keystore.set(db, provider_id, key)
+    return _response()
+
+
+@router.put("/toggle", response_model=SettingsResponse)
+async def toggle_provider(
+    body: ProviderToggle,
+    db: AsyncSession = Depends(get_db),
+):
+    """Turn a provider on or off without removing its API key."""
+    if body.provider not in PROVIDERS_BY_ID:
+        raise HTTPException(status_code=404, detail=f"Unknown provider: {body.provider}")
+    await keystore.set_enabled(db, body.provider, body.enabled)
     return _response()

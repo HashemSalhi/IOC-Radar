@@ -245,3 +245,19 @@ def test_urlscan_supports():
     assert provider.supports("url")
     assert provider.supports("domain")
     assert not provider.supports("ip")
+
+
+# ── Registry honors the on/off toggle ─────────────────────────────────────────
+
+def test_registry_respects_provider_toggle():
+    from app.providers.registry import get_providers
+    from app.services.keystore import keystore
+
+    keystore._keys.clear(); keystore._enabled.clear()
+    keystore._keys["virustotal"] = "x"           # key present, toggle defaults on
+    assert any(p.name == "virustotal" for p in get_providers())
+
+    keystore._enabled["virustotal"] = False        # toggled OFF
+    assert not any(p.name == "virustotal" for p in get_providers())
+
+    keystore._keys.clear(); keystore._enabled.clear()

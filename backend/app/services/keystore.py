@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 class KeyStore:
     def __init__(self):
         self._keys: dict[str, str] = {}
+        self._enabled: dict[str, bool] = {}  # toggle; default True when absent
         # Seed from env so the store is usable before DB is loaded
         self._load_from_env()
 
@@ -32,13 +33,16 @@ class KeyStore:
 
     async def load_from_db(self, db: AsyncSession) -> None:
         """Called once during app startup; DB values override env values."""
-        from app.database.crud import get_all_api_keys
+        from app.database.crud import get_all_provider_state
 
-        stored = await get_all_api_keys(db)
-        for provider, key in stored.items():
-            if key.strip():
-                self._keys[provider] = key.strip()
-                logger.info("Loaded API key for '%s' from database", provider)
+        state = await get_all_provider_state(db)
+        for provider, row in state.items():
+            if row["key"].strip():
+                self._keys[provider] = row["key"].strip()
+            self._enabled[provider] = row["enabled"]
+            logger.info(
+                "Loaded provider '%s' from database (enabled=%s)", provider, row["enabled"]
+            )
 
     async def set(self, db: AsyncSession, provider: str, key: str) -> None:
         """Update a key in memory and persist it to the database."""
@@ -53,11 +57,27 @@ class KeyStore:
         await upsert_api_key(db, provider, key)
         logger.info("API key for '%s' updated via web UI", provider)
 
+    async def set_enabled(self, db: AsyncSession, provider: str, enabled: bool) -> None:
+        """Persist the on/off toggle for a provider."""
+        from app.database.crud import set_provider_enabled
+
+        self._enabled[provider] = enabled
+        await set_provider_enabled(db, provider, enabled)
+        logger.info("Provider '%s' toggled %s", provider, "ON" if enabled else "OFF")
+
     def get(self, provider: str) -> str:
         return self._keys.get(provider, "")
 
-    def is_enabled(self, provider: str) -> bool:
+    def has_key(self, provider: str) -> bool:
         return bool(self._keys.get(provider, "").strip())
+
+    def is_enabled(self, provider: str) -> bool:
+        """User on/off toggle (defaults to True)."""
+        return self._enabled.get(provider, True)
+
+    def is_active(self, provider: str) -> bool:
+        """A provider runs only if it has a key AND is toggled on."""
+        return self.has_key(provider) and self.is_enabled(provider)
 
 
 keystore = KeyStore()

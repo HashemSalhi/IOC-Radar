@@ -1,6 +1,6 @@
 import datetime
 
-from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.db import Base
@@ -41,6 +41,7 @@ class ApiKey(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     provider: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
     key_value: Mapped[str] = mapped_column(String(512), nullable=False)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     updated_at: Mapped[datetime.datetime] = mapped_column(
         DateTime, default=_utcnow
     )

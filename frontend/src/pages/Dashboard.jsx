@@ -61,11 +61,11 @@ export default function Dashboard() {
           {providerStatus.map(p => (
             <div key={p.name} className="flex items-center justify-between text-xs font-mono">
               <span className="text-slate-300">
-                <ProviderDot enabled={p.enabled} />
+                <ProviderDot enabled={p.active} />
                 {p.name}
               </span>
               <span className="text-slate-600">
-                {p.enabled ? (p.key_hint || 'configured') : 'no API key'}
+                {p.active ? (p.key_hint || 'active') : !p.key_configured ? 'no API key' : 'off'}
               </span>
             </div>
           ))}

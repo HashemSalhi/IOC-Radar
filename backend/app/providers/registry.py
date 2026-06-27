@@ -30,7 +30,6 @@ def get_providers() -> list[Provider]:
 
     providers: list[Provider] = []
     for provider_id, factory in _factories().items():
-        key = keystore.get(provider_id)
-        if key:
-            providers.append(factory(key))
+        if keystore.is_active(provider_id):
+            providers.append(factory(keystore.get(provider_id)))
     return providers

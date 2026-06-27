@@ -130,3 +130,10 @@ export const updateApiKeys = (keys) =>
     method: 'PUT',
     body: JSON.stringify({ keys }),
   })
+
+// Turn a provider on/off without removing its key
+export const toggleProvider = (provider, enabled) =>
+  request('/settings/toggle', {
+    method: 'PUT',
+    body: JSON.stringify({ provider, enabled }),
+  })

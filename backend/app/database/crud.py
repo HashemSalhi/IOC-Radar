@@ -174,19 +174,41 @@ def hydrate_provider_results(scan: Scan) -> list[ProviderResult]:
 
 # ── API key persistence ────────────────────────────────────────────────────────
 
-async def get_all_api_keys(db: AsyncSession) -> dict[str, str]:
-    """Return {provider: key_value} for all stored keys."""
+async def get_all_provider_state(db: AsyncSession) -> dict[str, dict]:
+    """Return {provider: {"key": str, "enabled": bool}} for all stored rows.
+
+    Rows from before the `enabled` column existed read as NULL — treat those as
+    enabled so upgrading doesn't silently turn off previously-working providers.
+    """
     result = await db.execute(select(ApiKey))
-    return {row.provider: row.key_value for row in result.scalars().all()}
+    return {
+        row.provider: {
+            "key": row.key_value,
+            "enabled": True if row.enabled is None else bool(row.enabled),
+        }
+        for row in result.scalars().all()
+    }
 
 
 async def upsert_api_key(db: AsyncSession, provider: str, key_value: str) -> None:
-    """Insert or update the key for a provider."""
+    """Insert or update the key for a provider, preserving its enabled flag."""
     result = await db.execute(select(ApiKey).where(ApiKey.provider == provider))
     row = result.scalar_one_or_none()
     if row:
         row.key_value = key_value
         row.updated_at = _utcnow()
     else:
-        db.add(ApiKey(provider=provider, key_value=key_value))
+        db.add(ApiKey(provider=provider, key_value=key_value, enabled=True))
+    await db.commit()
+
+
+async def set_provider_enabled(db: AsyncSession, provider: str, enabled: bool) -> None:
+    """Persist the on/off toggle for a provider, creating a row if needed."""
+    result = await db.execute(select(ApiKey).where(ApiKey.provider == provider))
+    row = result.scalar_one_or_none()
+    if row:
+        row.enabled = enabled
+        row.updated_at = _utcnow()
+    else:
+        db.add(ApiKey(provider=provider, key_value="", enabled=enabled))
     await db.commit()

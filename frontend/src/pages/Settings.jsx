@@ -1,19 +1,39 @@
 import { useEffect, useState } from 'react'
-import { getSettings, updateApiKeys } from '../api/client'
+import { getSettings, toggleProvider, updateApiKeys } from '../api/client'
 
-function ProviderRow({ p }) {
+function Toggle({ on, disabled, onChange }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={on}
+      disabled={disabled}
+      onClick={() => onChange(!on)}
+      title={disabled ? 'Add an API key first' : on ? 'Turn off' : 'Turn on'}
+      className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors
+        ${disabled ? 'bg-slate-800 cursor-not-allowed opacity-50' : on ? 'bg-cyan-600' : 'bg-slate-700'}`}
+    >
+      <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${on ? 'translate-x-5' : 'translate-x-1'}`} />
+    </button>
+  )
+}
+
+function ProviderRow({ p, onToggle, busy }) {
+  const status = p.active
+    ? <span className="text-emerald-400">✓ Active</span>
+    : !p.key_configured
+      ? <span className="text-slate-600">no key</span>
+      : <span className="text-amber-400">off</span>
   return (
     <div className="flex items-center justify-between py-3 border-b border-[#1e2d4a] last:border-0">
       <div className="flex items-center gap-3">
-        <span className={`w-2 h-2 rounded-full ${p.enabled ? 'bg-emerald-400' : 'bg-slate-600'}`} />
+        <span className={`w-2 h-2 rounded-full ${p.active ? 'bg-emerald-400' : p.key_configured ? 'bg-amber-500' : 'bg-slate-600'}`} />
         <span className="text-sm font-mono text-slate-200">{p.name}</span>
+        {p.key_hint && <span className="text-[10px] font-mono text-slate-600">{p.key_hint}</span>}
       </div>
-      <div className="text-xs font-mono text-slate-500">
-        {p.enabled ? (
-          <span className="text-emerald-400">✓ Active {p.key_hint && `· ${p.key_hint}`}</span>
-        ) : (
-          <span className="text-slate-600">✕ No key configured</span>
-        )}
+      <div className="flex items-center gap-3">
+        <span className="text-xs font-mono">{status}</span>
+        <Toggle on={p.enabled} disabled={!p.key_configured || busy} onChange={(v) => onToggle(p.id, v)} />
       </div>
     </div>
   )
@@ -58,6 +78,7 @@ export default function Settings() {
   const [keyInputs, setKeyInputs] = useState({})
   const [saving, setSaving] = useState(false)
   const [saveMsg, setSaveMsg] = useState(null)   // { type: 'ok'|'error', text }
+  const [togglingId, setTogglingId] = useState(null)
 
   useEffect(() => {
     getSettings()
@@ -68,6 +89,18 @@ export default function Settings() {
 
   function setKey(id, value) {
     setKeyInputs(prev => ({ ...prev, [id]: value }))
+  }
+
+  async function handleToggle(providerId, enabled) {
+    setTogglingId(providerId)
+    try {
+      const updated = await toggleProvider(providerId, enabled)
+      setCfg(prev => ({ ...prev, providers: updated.providers }))
+    } catch (e) {
+      setSaveMsg({ type: 'error', text: e.message })
+    } finally {
+      setTogglingId(null)
+    }
   }
 
   async function handleSave(e) {
@@ -111,8 +144,11 @@ export default function Settings() {
 
       {/* Provider status */}
       <div className="bg-[#0f172a] border border-[#1e2d4a] rounded-lg p-4">
-        <div className="text-[10px] text-slate-500 uppercase tracking-widest mb-3">Provider Status</div>
-        {cfg?.providers.map(p => <ProviderRow key={p.name} p={p} />)}
+        <div className="text-[10px] text-slate-500 uppercase tracking-widest mb-3">Providers</div>
+        {cfg?.providers.map(p => (
+          <ProviderRow key={p.id} p={p} onToggle={handleToggle} busy={togglingId === p.id} />
+        ))}
+        <p className="text-[10px] text-slate-600 pt-3">Toggle a provider off to skip it in scans without removing its key.</p>
       </div>
 
       {/* Key entry form */}
