@@ -1,0 +1,38 @@
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+    )
+
+    # API Keys
+    virustotal_api_key: str = ""
+    abuseipdb_api_key: str = ""
+
+    # Limits
+    max_upload_mb: int = 32
+    max_iocs_per_scan: int = 200
+
+    # CORS
+    frontend_origin: str = "http://localhost:5173"
+
+    # Database
+    database_url: str = "sqlite+aiosqlite:///./ioc_radar.db"
+
+    @property
+    def max_upload_bytes(self) -> int:
+        return self.max_upload_mb * 1024 * 1024
+
+    @property
+    def virustotal_enabled(self) -> bool:
+        return bool(self.virustotal_api_key.strip())
+
+    @property
+    def abuseipdb_enabled(self) -> bool:
+        return bool(self.abuseipdb_api_key.strip())
+
+
+settings = Settings()
