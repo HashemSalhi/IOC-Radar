@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { scanFiles, scanStream } from '../api/client'
 import FileDropzone from '../components/FileDropzone'
 import ResultsTable from '../components/ResultsTable'
 import ScanProgress from '../components/ScanProgress'
+import { extractIocs } from '../utils/iocImport'
 
 export default function ScanPage() {
   const [mode, setMode] = useState('text')          // 'text' | 'files'
@@ -12,6 +13,35 @@ export default function ScanPage() {
   const [progress, setProgress] = useState(null)
   const [results, setResults] = useState([])
   const [error, setError] = useState(null)
+  const [importMsg, setImportMsg] = useState(null)
+  const importRef = useRef(null)
+
+  async function handleImportFile(e) {
+    const file = e.target.files?.[0]
+    e.target.value = ''  // allow re-importing the same file
+    if (!file) return
+    setError(null)
+    setImportMsg(null)
+    try {
+      const text = await file.text()
+      const { iocs, scanned, kept } = extractIocs(text)
+      if (!kept) {
+        setImportMsg({ type: 'error', text: `No indicators found in ${file.name}.` })
+        return
+      }
+      // Merge with whatever is already in the box, de-duplicating.
+      const existing = input.split(/[\n,]+/).map(s => s.trim()).filter(Boolean)
+      const merged = [...new Set([...existing, ...iocs])]
+      setInput(merged.join('\n'))
+      const skipped = scanned - kept
+      setImportMsg({
+        type: 'ok',
+        text: `Imported ${kept} IOC${kept === 1 ? '' : 's'} from ${file.name}${skipped > 0 ? ` (skipped ${skipped} non-IOC value${skipped === 1 ? '' : 's'})` : ''}.`,
+      })
+    } catch (err) {
+      setImportMsg({ type: 'error', text: `Could not read file: ${err.message}` })
+    }
+  }
 
   async function handleScan() {
     setError(null)
@@ -107,9 +137,31 @@ export default function ScanPage() {
       {/* Input area */}
       {mode === 'text' ? (
         <div className="space-y-2">
-          <label className="text-[10px] uppercase tracking-widest text-slate-500">
-            Paste IOCs (newline or comma separated)
-          </label>
+          <div className="flex items-center justify-between">
+            <label className="text-[10px] uppercase tracking-widest text-slate-500">
+              Paste IOCs (newline or comma separated)
+            </label>
+            <button
+              type="button"
+              onClick={() => importRef.current?.click()}
+              title="Import indicators from a .csv or .txt file"
+              className="text-xs font-mono px-2 py-1 border border-[#1e2d4a] rounded text-slate-400 hover:text-cyan-400 hover:border-cyan-700 transition-all"
+            >
+              📄 Import CSV/TXT
+            </button>
+            <input
+              ref={importRef}
+              type="file"
+              accept=".csv,.txt,.tsv,.log,text/csv,text/plain"
+              onChange={handleImportFile}
+              className="hidden"
+            />
+          </div>
+          {importMsg && (
+            <div className={`text-xs font-mono ${importMsg.type === 'ok' ? 'text-emerald-400' : 'text-red-400'}`}>
+              {importMsg.type === 'ok' ? '✓' : '✕'} {importMsg.text}
+            </div>
+          )}
           <textarea
             value={input}
             onChange={e => setInput(e.target.value)}
