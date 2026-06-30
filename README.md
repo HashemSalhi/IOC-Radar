@@ -1,24 +1,23 @@
 # Bulk-IOC-Scanner
 
-A web tool for SOC analysts to bulk-scan Indicators of Compromise — file hashes, IP
-addresses, domains, and URLs — against threat intelligence providers (VirusTotal & AbuseIPDB).
+A web tool for SOC analysts to bulk-scan Indicators of Compromise (file hashes, IPs, domains, URLs, and more) against threat intelligence providers.
 
 ![Bulk-IOC-Scanner screenshot](docs/screenshot.png)
 
 ## Features
 
-- **Bulk scanning** — paste many IOCs at once (newline or comma separated)
-- **File scanning** — files are hashed locally (MD5/SHA1/SHA256); only the hash is sent out
-- **Auto type detection** — hashes, IPs, domains, URLs (handles defanged IOCs too)
-- **Risk scoring** — 0–100 score, color-coded Low / Medium / High
-- **History, tagging, CSV export, and copy-ready investigation reports**
-- **API keys** configurable right in the UI — no file editing needed
+- **Bulk scanning.** Paste many IOCs at once, separated by newlines or commas.
+- **File scanning.** Files are hashed locally (MD5, SHA1, SHA256) and only the hash is sent out.
+- **Auto type detection.** Recognizes hashes, IPs, CIDRs, domains, URLs, emails, CVEs, ASNs, and crypto addresses. Handles defanged IOCs too.
+- **Multiple providers.** VirusTotal, AbuseIPDB, GreyNoise, ThreatFox, URLScan.io, IPify geolocation, and keyless RDAP/WHOIS.
+- **Risk scoring.** A 0 to 100 score, color coded Low, Medium, or High.
+- **History, tagging, and notes** for every scan.
+- **Flexible export.** CSV or JSON with a field picker, optional defanging, and copy-ready investigation reports.
+- **In-app settings.** Add API keys and toggle providers on or off from the UI. No file editing needed.
 
 ## Tech Stack
 
-FastAPI · SQLite · React · Tailwind CSS
-
----
+FastAPI, SQLite, React, Tailwind CSS.
 
 ## Running
 
@@ -41,10 +40,13 @@ Press **Ctrl+C** to stop.
 
 ```bash
 docker compose up --build
-# App: http://localhost   ·   API: http://localhost:8000
+# App: http://localhost
+# API: http://localhost:8000
 ```
 
----
+## API Keys
+
+RDAP/WHOIS works with no key. The other providers need free API keys, which you add in the **Settings** page or in `backend/.env` (see `.env.example`). Any provider without a key is simply skipped.
 
 ## License
 
