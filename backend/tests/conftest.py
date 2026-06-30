@@ -16,9 +16,10 @@ import pytest_asyncio  # noqa: E402
 from app.database.db import init_db  # noqa: E402
 from app.main import app  # noqa: E402
 from app.models.schemas import ProviderResult  # noqa: E402
+from app.providers.base import Provider  # noqa: E402
 
 
-class FakeProvider:
+class FakeProvider(Provider):
     """Stub provider returning canned results so endpoint tests need no network."""
     name = "fakeprovider"
 
