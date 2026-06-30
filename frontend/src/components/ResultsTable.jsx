@@ -3,15 +3,6 @@ import { maybeDefang } from '../utils/defang'
 import RiskBadge from './RiskBadge'
 import ResultDetailModal from './ResultDetailModal'
 
-const COLUMNS = [
-  { key: 'ioc',             label: 'IOC',            sortable: true  },
-  { key: 'ioc_type',        label: 'Type',           sortable: true  },
-  { key: 'risk_band',       label: 'Risk',           sortable: true  },
-  { key: 'detection_ratio', label: 'Detection',      sortable: false },
-  { key: 'source',          label: 'Source',         sortable: false },
-  { key: 'status',          label: 'Status',         sortable: false },
-]
-
 const RISK_ORDER = { High: 0, Medium: 1, Low: 2 }
 
 // Pull the first non-empty value for any of `keys` from the result's provider raws.
@@ -24,6 +15,39 @@ function fromProviders(r, keys) {
   }
   return ''
 }
+
+function StatusChip({ r }) {
+  return (
+    <span className={`px-1.5 py-0.5 rounded text-[10px] ${
+      r.status === 'error' ? 'text-red-400 bg-red-950/30' : 'text-emerald-400 bg-emerald-950/30'
+    }`}>
+      {r.status}
+    </span>
+  )
+}
+
+// Table column registry. `render` draws a custom cell; `value` builds plain text
+// (used for both the cell and as a fallback). Enrichment columns read from
+// provider results (IPify / AbuseIPDB / VirusTotal / RDAP).
+const TABLE_COLUMNS = [
+  { key: 'ioc',             label: 'IOC',         sortable: true,  default: true,
+    render: r => <span className="truncate block max-w-[260px]" title={r.ioc}>{r.ioc}</span> },
+  { key: 'ioc_type',        label: 'Type',        sortable: true,  default: true,  value: r => r.ioc_type?.toUpperCase() || '' },
+  { key: 'risk_band',       label: 'Risk',        sortable: true,  default: true,
+    render: r => <RiskBadge band={r.risk_band} score={r.risk_score} /> },
+  { key: 'detection_ratio', label: 'Detection',   sortable: false, default: true,  value: r => r.detection_ratio || '—' },
+  { key: 'source',          label: 'Source',      sortable: false, default: true,  value: r => r.source_filename || '—' },
+  { key: 'status',          label: 'Status',      sortable: false, default: true,  render: r => <StatusChip r={r} /> },
+  { key: 'country',         label: 'Country',     sortable: false, default: false, value: r => fromProviders(r, ['country', 'country_code']) || '—' },
+  { key: 'city',            label: 'City',        sortable: false, default: false, value: r => fromProviders(r, ['city']) || '—' },
+  { key: 'isp',             label: 'ISP / Owner', sortable: false, default: false, value: r => fromProviders(r, ['isp', 'as_owner', 'owner']) || '—' },
+  { key: 'asn',             label: 'ASN',         sortable: false, default: false, value: r => { const v = fromProviders(r, ['asn']); return v ? `AS${v}` : '—' } },
+  { key: 'registrar',       label: 'Registrar',   sortable: false, default: false, value: r => fromProviders(r, ['registrar']) || '—' },
+  { key: 'tag',             label: 'Tag',         sortable: false, default: false, value: r => r.tag || '—' },
+  { key: 'created_at',      label: 'Scanned',     sortable: false, default: false, value: r => (r.created_at ? new Date(r.created_at).toLocaleString() : '—') },
+]
+
+const DEFAULT_COLUMNS = TABLE_COLUMNS.filter(c => c.default).map(c => c.key)
 
 // Exportable fields. `get(r, defangOn)` returns the cell value; enrichment
 // fields read from provider results (IPify / AbuseIPDB / VirusTotal / RDAP).
@@ -93,6 +117,9 @@ export default function ResultsTable({ results, onTagUpdated, onResultReplaced }
   const [exportFields, setExportFields] = useState(DEFAULT_FIELDS)
   const [fieldsOpen, setFieldsOpen] = useState(false)
   const fieldsRef = useRef(null)
+  const [visibleCols, setVisibleCols] = useState(DEFAULT_COLUMNS)
+  const [colsOpen, setColsOpen] = useState(false)
+  const colsRef = useRef(null)
 
   useEffect(() => {
     if (!fieldsOpen) return
@@ -103,11 +130,32 @@ export default function ResultsTable({ results, onTagUpdated, onResultReplaced }
     return () => document.removeEventListener('mousedown', onClick)
   }, [fieldsOpen])
 
+  useEffect(() => {
+    if (!colsOpen) return
+    function onClick(e) {
+      if (colsRef.current && !colsRef.current.contains(e.target)) setColsOpen(false)
+    }
+    document.addEventListener('mousedown', onClick)
+    return () => document.removeEventListener('mousedown', onClick)
+  }, [colsOpen])
+
   function toggleField(key) {
     setExportFields(prev =>
       prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]
     )
   }
+
+  function toggleCol(key) {
+    setVisibleCols(prev =>
+      prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]
+    )
+  }
+
+  // Render columns in their registry order, limited to the selected ones.
+  const shownColumns = useMemo(
+    () => TABLE_COLUMNS.filter(c => visibleCols.includes(c.key)),
+    [visibleCols],
+  )
 
   const types = useMemo(() => {
     const s = new Set(results.map(r => r.ioc_type).filter(Boolean))
@@ -196,6 +244,42 @@ export default function ResultsTable({ results, onTagUpdated, onResultReplaced }
             />
             Defang
           </label>
+          <div className="relative" ref={colsRef}>
+            <button
+              onClick={() => setColsOpen(o => !o)}
+              title="Choose which columns to show in the table"
+              className="px-3 py-1.5 border border-[#1e2d4a] text-slate-400 hover:text-cyan-400 hover:border-cyan-700 rounded transition-all"
+            >
+              ▦ Columns ({visibleCols.length}) ▾
+            </button>
+            {colsOpen && (
+              <div className="absolute right-0 mt-1 z-20 w-52 bg-[#0f172a] border border-[#1e2d4a] rounded-lg shadow-xl p-2 max-h-72 overflow-y-auto">
+                <div className="flex justify-between px-1 pb-1 mb-1 border-b border-[#1e2d4a] text-[10px] uppercase tracking-widest text-slate-500">
+                  <span>Table columns</span>
+                  <button
+                    onClick={() => setVisibleCols(DEFAULT_COLUMNS)}
+                    className="text-cyan-600 hover:text-cyan-400 normal-case tracking-normal"
+                  >
+                    reset
+                  </button>
+                </div>
+                {TABLE_COLUMNS.map(c => (
+                  <label
+                    key={c.key}
+                    className="flex items-center gap-2 px-1 py-1 rounded hover:bg-cyan-950/20 cursor-pointer select-none text-slate-300"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={visibleCols.includes(c.key)}
+                      onChange={() => toggleCol(c.key)}
+                      className="accent-cyan-600"
+                    />
+                    {c.label}
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
           <div className="relative" ref={fieldsRef}>
             <button
               onClick={() => setFieldsOpen(o => !o)}
@@ -254,7 +338,7 @@ export default function ResultsTable({ results, onTagUpdated, onResultReplaced }
         <table className="w-full text-xs font-mono">
           <thead>
             <tr className="border-b border-[#1e2d4a] bg-slate-900/60">
-              {COLUMNS.map(col => (
+              {shownColumns.map(col => (
                 <th
                   key={col.key}
                   onClick={() => col.sortable && toggleSort(col.key)}
@@ -276,26 +360,11 @@ export default function ResultsTable({ results, onTagUpdated, onResultReplaced }
                 onClick={() => setSelected(r)}
                 className="border-b border-[#1e2d4a]/50 hover:bg-cyan-950/10 cursor-pointer transition-colors"
               >
-                <td className="px-4 py-3 text-slate-300 max-w-xs">
-                  <span className="truncate block max-w-[260px]" title={r.ioc}>{r.ioc}</span>
-                </td>
-                <td className="px-4 py-3 text-slate-400">{r.ioc_type?.toUpperCase()}</td>
-                <td className="px-4 py-3">
-                  <RiskBadge band={r.risk_band} score={r.risk_score} />
-                </td>
-                <td className="px-4 py-3 text-slate-400">{r.detection_ratio || '—'}</td>
-                <td className="px-4 py-3 text-slate-500 max-w-[120px] truncate">
-                  {r.source_filename || '—'}
-                </td>
-                <td className="px-4 py-3">
-                  <span className={`px-1.5 py-0.5 rounded text-[10px] ${
-                    r.status === 'error'
-                      ? 'text-red-400 bg-red-950/30'
-                      : 'text-emerald-400 bg-emerald-950/30'
-                  }`}>
-                    {r.status}
-                  </span>
-                </td>
+                {shownColumns.map(col => (
+                  <td key={col.key} className="px-4 py-3 text-slate-400 max-w-[200px] truncate">
+                    {col.render ? col.render(r) : col.value(r)}
+                  </td>
+                ))}
               </tr>
             ))}
           </tbody>
