@@ -11,7 +11,9 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/api': {
-        target: 'http://localhost:8000',
+        // Match the backend's actual bind host (run.sh binds 127.0.0.1, IPv4).
+        // Using "localhost" here can resolve to IPv6 ::1 and fail to connect.
+        target: 'http://127.0.0.1:8000',
         changeOrigin: true,
       },
     },
