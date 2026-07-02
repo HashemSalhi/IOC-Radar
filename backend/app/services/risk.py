@@ -1,6 +1,12 @@
 """Compute a normalised 0-100 risk score from provider results."""
 from app.models.schemas import ProviderResult
 
+# If more than this many VirusTotal vendors flag an IOC as malicious, treat it as
+# at least Medium risk regardless of the malicious/total ratio. A handful of
+# reputable engines agreeing is a stronger signal than a low ratio suggests.
+VT_MEDIUM_MALICIOUS_THRESHOLD = 4
+VT_MEDIUM_FLOOR = 50.0  # lands squarely in the Medium band (30 < score <= 70)
+
 
 def compute_risk(provider_results: list[ProviderResult]) -> tuple[float, str]:
     """
@@ -25,6 +31,11 @@ def compute_risk(provider_results: list[ProviderResult]) -> tuple[float, str]:
                 sus_ratio = (pr.suspicious or 0) / total * 0.5
                 vt_score = min((ratio + sus_ratio) * 100, 100)
                 scores.append(vt_score)
+
+        # More than N VirusTotal vendors flagging malicious => at least Medium,
+        # even if the ratio alone would score Low.
+        if pr.provider == "virustotal" and (pr.malicious or 0) > VT_MEDIUM_MALICIOUS_THRESHOLD:
+            scores.append(VT_MEDIUM_FLOOR)
 
         # AbuseIPDB-style: confidence score stored in raw
         if "abuse_confidence_score" in (pr.raw or {}):

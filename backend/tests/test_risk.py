@@ -33,6 +33,27 @@ def test_moderate_is_medium():
     assert 30 < score <= 70
 
 
+def test_more_than_four_vt_malicious_is_at_least_medium():
+    # 5/70 malicious is a low ratio (~7) that would score Low, but 5 vendors
+    # agreeing should bump it to Medium.
+    score, band = compute_risk([vt_result(5, 0, 60, 5)])
+    assert band == "Medium"
+    assert 30 < score <= 70
+
+
+def test_exactly_four_vt_malicious_stays_low():
+    # Threshold is "more than 4", so 4 flags with a low ratio remains Low.
+    score, band = compute_risk([vt_result(4, 0, 60, 6)])
+    assert band == "Low"
+
+
+def test_many_vt_malicious_still_high():
+    # A high ratio must still win over the Medium floor.
+    score, band = compute_risk([vt_result(60, 0, 5, 5)])
+    assert band == "High"
+    assert score > 70
+
+
 def test_abuseipdb_confidence_drives_score():
     pr = ProviderResult(
         provider="abuseipdb", ioc="1.2.3.4", ioc_type="ip", success=True,
